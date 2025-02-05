@@ -1,9 +1,8 @@
-# More information about the configuration file can be found here:
-# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-config.html
 version = 0.1
 
 [default.global.parameters]
-stack_name = "lambda-nodejs22.x"
+stack_name = "hello-test"
+region = "us-east-1"
 
 [default.build.parameters]
 cached = true
@@ -19,13 +18,15 @@ resolve_s3 = true
 stack_name = "hello-test"
 s3_prefix = "hello-test"
 region = "us-east-1"
-image_repositories = []
+image_repositories = [ ]
 
 [default.package.parameters]
 resolve_s3 = true
 
 [default.sync.parameters]
 watch = true
+template_file = "c:\\code\\q-test\\lambda-nodejs22.x\\template.yaml"
+dependency_layer = false
 
 [default.local_start_api.parameters]
 warm_containers = "EAGER"

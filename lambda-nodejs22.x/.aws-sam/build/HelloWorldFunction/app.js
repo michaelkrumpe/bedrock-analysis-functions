@@ -36,11 +36,11 @@ exports.lambdaHandler = async (event, context) => {
         
         // Prepare the request for Claude model
         const request = {
-            modelId: "anthropic.claude-v2",
+            modelId: "anthropic.claude-3-5-sonnet-20241022-v2:0",
             contentType: "application/json",
             accept: "application/json",
             body: JSON.stringify({
-                prompt: `\n\nHuman: You are a financial business analyst that is looking for coorelating data about how a company is affected by external factors. Please provide information about ${companyName} and how ${affect} affects company performance.\n\nAssistant:`,
+                prompt: `\n\nHuman: You are a company analyst that is looking for coorelating data about a company. Please provide information about ${companyName} and how ${affect} affects company performance. You may make some inferred assumptions based on business loan data, employment earnings, and tax income as a basis to identify trends that may impact this company.\n\nAssistant:`,
                 max_tokens_to_sample: 2000,
                 temperature: 0.7,
                 top_p: 1
