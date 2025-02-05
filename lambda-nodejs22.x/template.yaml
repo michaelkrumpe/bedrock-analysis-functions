@@ -11,26 +11,30 @@ Globals:
     Timeout: 3
 
 Resources:
-  HelloWorldFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+  BedrockAnalysisFunction:    # Changed from HelloWorldFunction
+    Type: AWS::Serverless::Function
     Properties:
-      CodeUri: hello-world/
+      FunctionName: bedrock-analysis-function  # Changed from hello-world-function
+      CodeUri: bedrock-analysis/    # Changed from hello-world/
       Handler: app.lambdaHandler
-      Runtime: nodejs22.x
+      Runtime: nodejs20.x
       Architectures:
         - x86_64
       Events:
-        HelloWorld:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+        BedrockAnalysis:    # Changed from HelloWorld
+          Type: Api
           Properties:
-            Path: /hello
+            Path: /analyze    # Consider changing from /hello to something more descriptive
             Method: get
+
   S3unzipFunction:
-    Type: AWS::Serverless::Function 
+    Type: AWS::Serverless::Function
     Properties:
+      FunctionName: s3-unzip-function # Add this line to explicitly name the function
       CodeUri: s3unzip/
       Handler: app.lambdaHandler
-      Runtime: nodejs22.x
+      Runtime: nodejs20.x
+      MemorySize: 512
       Policies:
         - S3ReadPolicy:
             BucketName: '*'
@@ -40,24 +44,25 @@ Resources:
         - x86_64
       Events:
         S3unzip:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Type: Api
           Properties:
             Path: /s3unzip
             Method: post
+
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  BedrockAnalysisApi:    
+    Description: "API Gateway endpoint URL for Prod stage for Bedrock Analysis function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/analyze/"
+  BedrockAnalysisFunction:    
+    Description: "Bedrock Analysis Lambda Function ARN"
+    Value: !GetAtt BedrockAnalysisFunction.Arn
+  BedrockAnalysisFunctionIamRole:   
+    Description: "Implicit IAM Role created for Bedrock Analysis function"
+    Value: !GetAtt BedrockAnalysisFunctionRole.Arn
   S3unzipApi:
     Description: "API Gateway endpoint URL for Prod stage for S3 Unzip function"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/s3unzip/"

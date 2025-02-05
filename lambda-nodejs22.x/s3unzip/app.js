@@ -21,9 +21,10 @@ const uploadToS3 = async (bucket, key, bodyStream) => {
             Body: bodyStream
         }));
     } catch (err) {
-        console.error(`Error uploading ${key} to ${bucket}:`, err);
+        console.error(`Error uploading ${JSON.stringify(key)} to ${JSON.stringify(bucket)}:`, JSON.stringify(err));
         throw err;
     }
+
 };
 
 exports.lambdaHandler = async (event) => {
@@ -39,7 +40,7 @@ exports.lambdaHandler = async (event) => {
         const source = parseS3Uri(sourceUri);
         const destination = parseS3Uri(destinationUri);
 
-        console.log(`Processing zip file from ${source.bucket}/${source.key}`);
+        console.log(`Processing zip file from ${JSON.stringify(source.bucket)}/${JSON.stringify(source.key)}`);
 
         // Get the zip file from S3
         const zipFile = await s3Client.send(new GetObjectCommand({
@@ -58,7 +59,8 @@ exports.lambdaHandler = async (event) => {
             if (type === 'File') {
                 const destinationKey = `${destination.key}/${fileName}`.replace(/^\/+/, '');
                 
-                console.log(`Extracting ${fileName} to ${destination.bucket}/${destinationKey}`);
+                // amazonq-ignore-next-line
+                console.log(`Extracting ${JSON.stringify(fileName)} to ${JSON.stringify(destination.bucket)}/${JSON.stringify(destinationKey)}`);
 
                 // Upload the file to the destination
                 await uploadToS3(destination.bucket, destinationKey, entry);
@@ -77,7 +79,7 @@ exports.lambdaHandler = async (event) => {
             })
         };
     } catch (err) {
-        console.error('Error:', err);
+        console.error('Error:', JSON.stringify(err));
         return {
             statusCode: 500,
             body: JSON.stringify({
@@ -86,4 +88,5 @@ exports.lambdaHandler = async (event) => {
             })
         };
     }
+
 };

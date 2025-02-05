@@ -3,36 +3,32 @@
         {
             "type": "aws-sam",
             "request": "direct-invoke",
-            "name": "lambda-nodejs22.x:HelloWorldFunction (nodejs22.x)",
+            "name": "lambda-nodejs22.x:BedrockAnalysisFunction (nodejs20.x)",
             "invokeTarget": {
                 "target": "template",
                 "templatePath": "${workspaceFolder}/lambda-nodejs22.x/template.yaml",
-                "logicalId": "HelloWorldFunction"
+                "logicalId": "BedrockAnalysisFunction"  
             },
             "lambda": {
                 "payload": {},
                 "environmentVariables": {},
-                "runtime": "nodejs22.x"
+                "runtime": "nodejs20.x"
             }
         },
         {
             "type": "aws-sam",
             "request": "direct-invoke",
-            "name": "API lambda-nodejs22.x:HelloWorldFunction (nodejs22.x)",
-            "invokeTarget": {
+            "name": "API lambda-nodejs22.x:BedrockAnalysisFunction (nodejs20.x)", 
                 "target": "api",
                 "templatePath": "${workspaceFolder}/lambda-nodejs22.x/template.yaml",
-                "logicalId": "HelloWorldFunction"
+                "logicalId": "BedrockAnalysisFunction"  
             },
             "api": {
-                "path": "/hello",
+                "path": "/analyze",  // Changed from /hello
                 "httpMethod": "get",
                 "payload": {
-                    "json": {}
+                    // Your payload configuration
                 }
-            },
-            "lambda": {
-                "runtime": "nodejs22.x"
             }
         }
     ]
