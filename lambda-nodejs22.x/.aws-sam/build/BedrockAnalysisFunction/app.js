@@ -1,92 +1,157 @@
-// const axios = require('axios')
-// const url = 'http://checkip.amazonaws.com/';
-const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-bedrock-runtime");
-let response;
+const { 
+    BedrockAgentRuntimeClient, 
+    RetrieveAndGenerateCommand
+} = require("@aws-sdk/client-bedrock-agent-runtime");
 
-/**
- *
- * Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
- * @param {Object} event - API Gateway Lambda Proxy Input Format
- *
- * Context doc: https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-context.html 
- * @param {Object} context
- *
- * Return doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
- * @returns {Object} object - API Gateway Lambda Proxy Output Format
- * 
- */
+const isValidAwsRegion = (region) => {
+    const regionRegex = /^[a-z]{2}-[a-z]+-\d{1}$/;
+    return regionRegex.test(region);
+};
+
+// Base prompt template
+const BASE_PROMPT_TEMPLATE = (companyName, affect, stockSymbol = null) => {
+    const companyIdentifier = stockSymbol ? `${companyName} (${stockSymbol})` : companyName;
+    
+    return `You are a business analyst examining how external factors affect company performance.
+
+Based on the retrieved information, provide an analysis of how ${affect} impacts ${companyIdentifier}'s business performance and operations.
+Please format the content in markdown format.
+Please structure your response as follows:
+1. Brief overview of the relationship between ${affect} and ${companyIdentifier}
+2. Key impacts identified from the data
+3. Notable examples or specific instances (if available)
+4. Summary of the overall effect`;
+};
 
 exports.lambdaHandler = async (event, context) => {
     try {
         console.log('Event received:', JSON.stringify(event, null, 2));
         
-        // Initialize the Bedrock client
-        const bedrockClient = new BedrockRuntimeClient({ region: "us-east-1" });
-        console.log('Bedrock client initialized');
-
-        // Get the company name from the POST request body
-        if (!event.body) {
-            throw new Error('Request body is required');
+        // Determine if this is an API Gateway event or direct invocation
+        let requestBody;
+        if (event.body) {
+            // API Gateway event
+            requestBody = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+        } else {
+            // Direct invocation
+            requestBody = event;
         }
 
-        const requestBody = JSON.parse(event.body);
-        console.log('Request body:', JSON.stringify(requestBody));
+        console.log('Processed request body:', JSON.stringify(requestBody, null, 2));
 
-        if (!requestBody.companyName) {
-            throw new Error('companyName is required in the request body');
+        // Validate required parameters
+        if (!requestBody.companyName || !requestBody.affect) {
+            throw new Error('companyName and affect are required in the request');
         }
 
-        const companyName = requestBody.companyName;
-        const affect = requestBody.affect;
+        if (!requestBody.bedrockRegion) {
+            throw new Error('bedrockRegion is required in the request');
+        }
+
+        if (!isValidAwsRegion(requestBody.bedrockRegion)) {
+            throw new Error('Invalid AWS region format');
+        }
+
+        const { 
+            companyName, 
+            affect, 
+            knowledgeBaseIds, 
+            bedrockRegion,
+            stockSymbol 
+        } = requestBody;
+
+        console.log('Using Bedrock region:', bedrockRegion);
+        if (knowledgeBaseIds) {
+            if (!Array.isArray(knowledgeBaseIds) || knowledgeBaseIds.length === 0) {
+                throw new Error('If provided, knowledgeBaseIds must be a non-empty array');
+            }
+            console.log('Using knowledge bases:', knowledgeBaseIds);
+        }
+
+        // Initialize the Bedrock client with the specified region
+        const bedrockAgentClient = new BedrockAgentRuntimeClient({ 
+            region: bedrockRegion 
+        });
+
+        let retrieveAndGenerateRequest;
         
-        // Prepare the request for Claude model
-        const request = {
-            modelId: "anthropic.claude-v2:1",
-            contentType: "application/json",
-            accept: "application/json",
-            body: JSON.stringify({
-                prompt: `\n\nHuman: You are a financial business analyst that is looking for coorelating data about how a company is affected by external factors. Please provide information about ${companyName} and how ${affect} affects company performance.\n\nAssistant:`,
-                max_tokens_to_sample: 2000,
-                temperature: 0.7,
-                top_p: 1
-            })
+        if (knowledgeBaseIds && knowledgeBaseIds.length > 0) {
+            // If knowledge bases are provided, use them for retrieval
+            retrieveAndGenerateRequest = {
+                knowledgeBaseIds: knowledgeBaseIds,
+                retrievalQuery: `Information about ${companyName}${stockSymbol ? ` (${stockSymbol})` : ''} and how ${affect} affects its business performance and operations`,
+                retrievalConfiguration: {
+                    vectorSearchConfiguration: {
+                        numberOfResults: 3
+                    }
+                },
+                promptTemplate: `${BASE_PROMPT_TEMPLATE(companyName, affect, stockSymbol)}
+
+Focus on factual information from the provided data sources.`
+            };
+        } else {
+            // If no knowledge bases are provided, just use the prompt without retrieval
+            retrieveAndGenerateRequest = {
+                promptTemplate: `${BASE_PROMPT_TEMPLATE(companyName, affect, stockSymbol)}
+
+Base your analysis on general business principles and industry knowledge.`
+            };
+        }
+
+        console.log('Sending RetrieveAndGenerate request:', JSON.stringify(retrieveAndGenerateRequest, null, 2));
+        
+        const command = new RetrieveAndGenerateCommand(retrieveAndGenerateRequest);
+        const response = await bedrockAgentClient.send(command);
+
+        const responseBody = {
+            message: response.generateResponse.output,
+            companyQueried: companyName,
+            stockSymbol: stockSymbol || null,
+            factorAnalyzed: affect,
+            retrievalMetadata: {
+                totalRetrieved: response.retrievalResults?.length || 0,
+                knowledgeBasesUsed: knowledgeBaseIds || [],
+                bedrockRegion: bedrockRegion,
+                usedKnowledgeBases: knowledgeBaseIds ? true : false
+            }
         };
-        console.log('Bedrock request prepared:', JSON.stringify(request, null, 2));
 
-        // Invoke the model
-        console.log('Invoking Bedrock model...');
-        const command = new InvokeModelCommand(request);
-        const bedrockResponse = await bedrockClient.send(command);
-        console.log('Bedrock response received');
+        // If this was an API Gateway event, wrap the response appropriately
+        if (event.body) {
+            return {
+                'statusCode': 200,
+                'headers': { 'Content-Type': 'application/json' },
+                'body': JSON.stringify(responseBody),
+                'isBase64Encoded': false
+            };
+        }
 
-        // Parse the response
-        const responseBody = JSON.parse(new TextDecoder().decode(bedrockResponse.body));
-        console.log('Response parsed:', JSON.stringify(responseBody, null, 2));
+        // For direct invocation, return the response body directly
+        return responseBody;
 
-        response = {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
-            'body': JSON.stringify({
-                message: responseBody.completion,
-                companyQueried: companyName
-            })
-        };
     } catch (err) {
         console.error('Error details:', {
             message: err.message,
             stack: err.stack,
             name: err.name
         });
-        response = {
-            'statusCode': err.message.includes('required') ? 400 : 500,
-            'body': JSON.stringify({
-                message: 'Error processing request',
-                error: err.message
-            })
-        };
-    }
 
-    return response;
+        const errorResponse = {
+            message: 'Error processing request',
+            error: err.message
+        };
+
+        // If this was an API Gateway event, wrap the error response appropriately
+        if (event.body) {
+            return {
+                'statusCode': err.message.includes('required') || 
+                             err.message.includes('must be') || 
+                             err.message.includes('Invalid AWS region') ? 400 : 500,
+                'body': JSON.stringify(errorResponse)
+            };
+        }
+
+        // For direct invocation, throw the error or return error response
+        throw err;
+    }
 };
