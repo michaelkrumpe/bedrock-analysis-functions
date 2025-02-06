@@ -1,83 +1,94 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: |
-  lambda-nodejs22.x
+Description: 'lambda-nodejs22.x
+
   Sample SAM Template for lambda-nodejs22.x
 
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+  '
 Globals:
   Api:
     Auth:
       ApiKeyRequired: true
-
 Resources:
   BedrockAnalysisFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: bedrock-analysis-function
-      CodeUri: bedrock-analysis/
+      CodeUri: BedrockAnalysisFunction
       Handler: app.lambdaHandler
       Runtime: nodejs20.x
       Timeout: 30
       Architectures:
-        - x86_64
+      - x86_64
       Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - bedrock:InvokeModel
-              Resource:
-                - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-v2:1
-                # Add other model ARNs if needed
+      - Statement:
+        - Effect: Allow
+          Action:
+          - bedrock:InvokeModel
+          Resource:
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-v2:1
       Events:
         BedrockAnalysis:
           Type: Api
           Properties:
             Path: /analyze
             Method: post
-
+    Metadata:
+      SamResourceId: BedrockAnalysisFunction
   S3unzipFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: s3-unzip-function
-      CodeUri: s3unzip/
+      CodeUri: S3unzipFunction
       Handler: app.lambdaHandler
       Runtime: nodejs20.x
-      Timeout: 300 # 5 minute timeout to allow time for zip extraction
+      Timeout: 300
       MemorySize: 1024
       Policies:
-        - S3ReadPolicy:
-            BucketName: '*'
-        - S3CrudPolicy:
-            BucketName: '*'
+      - S3ReadPolicy:
+          BucketName: '*'
+      - S3CrudPolicy:
+          BucketName: '*'
       Architectures:
-        - x86_64
+      - x86_64
       Events:
         S3unzip:
           Type: Api
           Properties:
             Path: /s3unzip
             Method: post
-
+    Metadata:
+      SamResourceId: S3unzipFunction
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   BedrockAnalysisApi:
     Description: API Gateway endpoint URL for Prod stage for Bedrock Analysis function
-    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/analyze/
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/analyze/
   BedrockAnalysisFunction:
     Description: Bedrock Analysis Lambda Function ARN
-    Value: !GetAtt BedrockAnalysisFunction.Arn
+    Value:
+      Fn::GetAtt:
+      - BedrockAnalysisFunction
+      - Arn
   BedrockAnalysisFunctionIamRole:
     Description: Implicit IAM Role created for Bedrock Analysis function
-    Value: !GetAtt BedrockAnalysisFunctionRole.Arn
+    Value:
+      Fn::GetAtt:
+      - BedrockAnalysisFunctionRole
+      - Arn
   S3unzipApi:
     Description: API Gateway endpoint URL for Prod stage for S3 Unzip function
-    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/s3unzip/
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/s3unzip/
   S3unzipFunction:
     Description: S3 Unzip Lambda Function ARN
-    Value: !GetAtt S3unzipFunction.Arn
+    Value:
+      Fn::GetAtt:
+      - S3unzipFunction
+      - Arn
   S3unzipFunctionIamRole:
     Description: Implicit IAM Role created for S3 Unzip function
-    Value: !GetAtt S3unzipFunctionRole.Arn
+    Value:
+      Fn::GetAtt:
+      - S3unzipFunctionRole
+      - Arn
