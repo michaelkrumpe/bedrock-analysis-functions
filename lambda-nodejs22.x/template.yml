@@ -48,26 +48,27 @@ Resources:
           AWS_SDK_JS_DEBUG: "true"
       Tracing: Active
 
-  KB-sync:
+  KBSync:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: kb-sync-function
       CodeUri: kb-sync/
       Handler: app.lambdaHandler
-      Runtime: nodejs20.x
+      Runtime: nodejs22.x
       Timeout: 30
       Architectures:
         - x86_64
       Policies:
         - S3ReadPolicy:
             BucketName: '*'
-        - S3CrudPolicy:
-            BucketName: '*'
         - Statement:
             - Effect: Allow
               Action:
-                - aoss: APIAccessAll
-              Resource: '*'
+                - bedrock:ListDataSources
+                - bedrock:StartIngestionJob
+                - bedrock:GetKnowledgeBase
+              Resource: 
+                - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*'
       Events:
         KBSync:
           Type: Api
@@ -78,8 +79,6 @@ Resources:
         Variables:
           AWS_SDK_JS_SUPPRESS_MAINTENANCE_MODE_MESSAGE: "1"
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
-          AWS_SDK_JS_DEBUG: "true"
-      Tracing: Active
 
   S3unzipFunction:
     Type: AWS::Serverless::Function

@@ -80,11 +80,6 @@ exports.lambdaHandler = async (event, context) => {
             console.log('DEBUGGING - Entering knowledge base path');
             console.log('Using knowledge base:', knowledgeBaseId);
 
-            //const agentClient = new BedrockAgentRuntimeClient({ 
-            //    region: bedrockRegion 
-            //});
-
-            // Wrap your clients with X-Ray
             const bedrockClient = AWSXRay.captureAWSv3Client(new BedrockRuntimeClient({ 
                 region: bedrockRegion 
             }));
@@ -102,7 +97,7 @@ exports.lambdaHandler = async (event, context) => {
                     type: "KNOWLEDGE_BASE",
                     knowledgeBaseConfiguration: {
                         knowledgeBaseId: knowledgeBaseId,
-                        modelArn: `arn:aws:bedrock:${bedrockRegion}::foundation-model/anthropic.claude-v2`
+                        modelArn: `arn:aws:bedrock:${bedrockRegion}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0`
                     }
                 }
             };
@@ -124,7 +119,11 @@ exports.lambdaHandler = async (event, context) => {
                         knowledgeBasesUsed: [knowledgeBaseId],
                         bedrockRegion: bedrockRegion,
                         usedKnowledgeBase: true,
-                        citations: response.citations || []
+                        citations: response.citations || [],
+                        tokenUsage: {
+                            inputTokens: response.inputTokenUsage || 0,
+                            outputTokens: response.outputTokenUsage || 0,
+                            totalTokens: (response.inputTokenUsage || 0) + (response.outputTokenUsage || 0)
                     }
                 };
 

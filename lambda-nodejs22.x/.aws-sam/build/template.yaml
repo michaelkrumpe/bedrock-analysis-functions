@@ -48,6 +48,39 @@ Resources:
       Tracing: Active
     Metadata:
       SamResourceId: BedrockAnalysisFunction
+  KBSync:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: kb-sync-function
+      CodeUri: KBSync
+      Handler: app.lambdaHandler
+      Runtime: nodejs22.x
+      Timeout: 30
+      Architectures:
+      - x86_64
+      Policies:
+      - S3ReadPolicy:
+          BucketName: '*'
+      - Statement:
+        - Effect: Allow
+          Action:
+          - bedrock:ListDataSources
+          - bedrock:StartIngestionJob
+          - bedrock:GetKnowledgeBase
+          Resource:
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
+      Events:
+        KBSync:
+          Type: Api
+          Properties:
+            Path: /sync
+            Method: post
+      Environment:
+        Variables:
+          AWS_SDK_JS_SUPPRESS_MAINTENANCE_MODE_MESSAGE: '1'
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+    Metadata:
+      SamResourceId: KBSync
   S3unzipFunction:
     Type: AWS::Serverless::Function
     Properties:

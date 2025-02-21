@@ -18,4 +18,13 @@ manifest_hash = "3b9e060c1787f29bb6984775edb4ac0c"
 packagetype = "Zip"
 functions = ["S3unzipFunction"]
 
+[function_build_definitions.492206ae-d4f3-4c2e-a4c3-be5e0cabcd4e]
+codeuri = "C:\\code\\q-test\\lambda-nodejs22.x\\kb-sync"
+runtime = "nodejs22.x"
+architecture = "x86_64"
+handler = "app.lambdaHandler"
+manifest_hash = "5df8cf74706eaf580d5752d93790aa0e"
+packagetype = "Zip"
+functions = ["KBSync"]
+
 [layer_build_definitions]
