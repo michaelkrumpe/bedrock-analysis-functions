@@ -1,12 +1,6 @@
-const { 
-    BedrockRuntimeClient, 
-    InvokeModelCommand 
-} = require("@aws-sdk/client-bedrock-runtime");
-const {
-    BedrockAgentRuntimeClient,
-    RetrieveAndGenerateCommand,
-    GetKnowledgeBaseCommand  
-} = require("@aws-sdk/client-bedrock-agent-runtime");
+const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-bedrock-runtime");
+const { BedrockAgentRuntimeClient, RetrieveAndGenerateCommand } = require("@aws-sdk/client-bedrock-agent-runtime");
+
 
 const AWSXRay = require('aws-xray-sdk-core');  // Add this line
 
