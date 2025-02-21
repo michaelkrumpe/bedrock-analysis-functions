@@ -25,14 +25,27 @@ Resources:
         - Effect: Allow
           Action:
           - bedrock:InvokeModel
+          - bedrock:InvokeModelWithResponseStream
+          - bedrock:Retrieve
+          - bedrock:RetrieveAndGenerate
+          - bedrock-agent-runtime:RetrieveAndGenerate
+          - bedrock-agent:GetKnowledgeBase
           Resource:
-          - Fn::Sub: arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-v2:1
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}::foundation-model/*
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
+          - Fn::Sub: arn:aws:aoss:${AWS::Region}:${AWS::AccountId}:collection/*
       Events:
         BedrockAnalysis:
           Type: Api
           Properties:
             Path: /analyze
             Method: post
+      Environment:
+        Variables:
+          AWS_SDK_JS_SUPPRESS_MAINTENANCE_MODE_MESSAGE: '1'
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+          AWS_SDK_JS_DEBUG: 'true'
+      Tracing: Active
     Metadata:
       SamResourceId: BedrockAnalysisFunction
   S3unzipFunction:

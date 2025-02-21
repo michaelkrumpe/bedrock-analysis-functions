@@ -26,15 +26,60 @@ Resources:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock:Retrieve
+                - bedrock:RetrieveAndGenerate
+                - bedrock-agent-runtime:RetrieveAndGenerate
+                - bedrock-agent:GetKnowledgeBase
               Resource:
-                - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-v2:1
-                # Add other model ARNs if needed
+                - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/*
+                - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
+                - !Sub arn:aws:aoss:${AWS::Region}:${AWS::AccountId}:collection/*
       Events:
         BedrockAnalysis:
           Type: Api
           Properties:
             Path: /analyze
             Method: post
+      Environment:
+        Variables:
+          AWS_SDK_JS_SUPPRESS_MAINTENANCE_MODE_MESSAGE: "1"
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+          AWS_SDK_JS_DEBUG: "true"
+      Tracing: Active
+
+  KB-sync:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: kb-sync-function
+      CodeUri: kb-sync/
+      Handler: app.lambdaHandler
+      Runtime: nodejs20.x
+      Timeout: 30
+      Architectures:
+        - x86_64
+      Policies:
+        - S3ReadPolicy:
+            BucketName: '*'
+        - S3CrudPolicy:
+            BucketName: '*'
+        - Statement:
+            - Effect: Allow
+              Action:
+                - aoss: APIAccessAll
+              Resource: '*'
+      Events:
+        KBSync:
+          Type: Api
+          Properties:
+            Path: /sync
+            Method: post
+      Environment:
+        Variables:
+          AWS_SDK_JS_SUPPRESS_MAINTENANCE_MODE_MESSAGE: "1"
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+          AWS_SDK_JS_DEBUG: "true"
+      Tracing: Active
 
   S3unzipFunction:
     Type: AWS::Serverless::Function

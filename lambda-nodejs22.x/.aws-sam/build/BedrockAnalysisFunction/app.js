@@ -1,20 +1,25 @@
 const { 
-    BedrockAgentRuntimeClient, 
-    RetrieveAndGenerateCommand
+    BedrockRuntimeClient, 
+    InvokeModelCommand 
+} = require("@aws-sdk/client-bedrock-runtime");
+const {
+    BedrockAgentRuntimeClient,
+    RetrieveAndGenerateCommand,
+    GetKnowledgeBaseCommand  
 } = require("@aws-sdk/client-bedrock-agent-runtime");
+
+const AWSXRay = require('aws-xray-sdk-core');  // Add this line
 
 const isValidAwsRegion = (region) => {
     const regionRegex = /^[a-z]{2}-[a-z]+-\d{1}$/;
     return regionRegex.test(region);
 };
 
-// Base prompt template
 const BASE_PROMPT_TEMPLATE = (companyName, affect, stockSymbol = null) => {
     const companyIdentifier = stockSymbol ? `${companyName} (${stockSymbol})` : companyName;
-    
     return `You are a business analyst examining how external factors affect company performance.
 
-Based on the retrieved information, provide an analysis of how ${affect} impacts ${companyIdentifier}'s business performance and operations.
+Based on the business knowledge and retrieved information, provide an analysis of how ${affect} impacts ${companyIdentifier}'s business performance and operations.
 Please format the content in markdown format.
 Please structure your response as follows:
 1. Brief overview of the relationship between ${affect} and ${companyIdentifier}
@@ -25,21 +30,17 @@ Please structure your response as follows:
 
 exports.lambdaHandler = async (event, context) => {
     try {
-        console.log('Event received:', JSON.stringify(event, null, 2));
+        console.log('DEBUGGING - Event received:', JSON.stringify(event, null, 2));
         
-        // Determine if this is an API Gateway event or direct invocation
         let requestBody;
         if (event.body) {
-            // API Gateway event
             requestBody = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
         } else {
-            // Direct invocation
             requestBody = event;
         }
 
-        console.log('Processed request body:', JSON.stringify(requestBody, null, 2));
+        console.log('DEBUGGING - Processed request body:', JSON.stringify(requestBody, null, 2));
 
-        // Validate required parameters
         if (!requestBody.companyName || !requestBody.affect) {
             throw new Error('companyName and affect are required in the request');
         }
@@ -55,85 +56,160 @@ exports.lambdaHandler = async (event, context) => {
         const { 
             companyName, 
             affect, 
-            knowledgeBaseIds, 
+            knowledgeBaseId,  
             bedrockRegion,
             stockSymbol 
         } = requestBody;
 
-        console.log('Using Bedrock region:', bedrockRegion);
-        if (knowledgeBaseIds) {
-            if (!Array.isArray(knowledgeBaseIds) || knowledgeBaseIds.length === 0) {
-                throw new Error('If provided, knowledgeBaseIds must be a non-empty array');
-            }
-            console.log('Using knowledge bases:', knowledgeBaseIds);
-        }
-
-        // Initialize the Bedrock client with the specified region
-        const bedrockAgentClient = new BedrockAgentRuntimeClient({ 
-            region: bedrockRegion 
+        console.log('DEBUGGING - Extracted Values:', {
+            companyName,
+            affect,
+            knowledgeBaseId,
+            bedrockRegion,
+            stockSymbol
         });
 
-        let retrieveAndGenerateRequest;
-        
-        if (knowledgeBaseIds && knowledgeBaseIds.length > 0) {
-            // If knowledge bases are provided, use them for retrieval
-            retrieveAndGenerateRequest = {
-                knowledgeBaseIds: knowledgeBaseIds,
-                retrievalQuery: `Information about ${companyName}${stockSymbol ? ` (${stockSymbol})` : ''} and how ${affect} affects its business performance and operations`,
-                retrievalConfiguration: {
-                    vectorSearchConfiguration: {
-                        numberOfResults: 3
-                    }
+        console.log('DEBUGGING - Knowledge Base Check:', {
+            hasKnowledgeBaseId: Boolean(knowledgeBaseId),
+            knowledgeBaseIdValue: knowledgeBaseId,
+            knowledgeBaseIdType: typeof knowledgeBaseId,
+            trimmedLength: knowledgeBaseId?.trim()?.length
+        });
+
+        if (knowledgeBaseId?.trim()) {
+            console.log('DEBUGGING - Entering knowledge base path');
+            console.log('Using knowledge base:', knowledgeBaseId);
+
+            //const agentClient = new BedrockAgentRuntimeClient({ 
+            //    region: bedrockRegion 
+            //});
+
+            // Wrap your clients with X-Ray
+            const bedrockClient = AWSXRay.captureAWSv3Client(new BedrockRuntimeClient({ 
+                region: bedrockRegion 
+            }));
+
+            const agentClient = AWSXRay.captureAWSv3Client(new BedrockAgentRuntimeClient({ 
+                region: bedrockRegion 
+            }));
+
+
+            const retrieveRequest = {
+                input: {
+                    text: BASE_PROMPT_TEMPLATE(companyName, affect, stockSymbol)
                 },
-                promptTemplate: `${BASE_PROMPT_TEMPLATE(companyName, affect, stockSymbol)}
-
-Focus on factual information from the provided data sources.`
+                retrieveAndGenerateConfiguration: {
+                    type: "KNOWLEDGE_BASE",
+                    knowledgeBaseConfiguration: {
+                        knowledgeBaseId: knowledgeBaseId,
+                        modelArn: `arn:aws:bedrock:${bedrockRegion}::foundation-model/anthropic.claude-v2`
+                    }
+                }
             };
-        } else {
-            // If no knowledge bases are provided, just use the prompt without retrieval
-            retrieveAndGenerateRequest = {
-                promptTemplate: `${BASE_PROMPT_TEMPLATE(companyName, affect, stockSymbol)}
+            
+            
+            console.log('DEBUGGING - Retrieve Request:', JSON.stringify(retrieveRequest, null, 2));
+            
+            try {
+                const response = await agentClient.send(new RetrieveAndGenerateCommand(retrieveRequest));
+                console.log('DEBUGGING - Knowledge Base Response:', JSON.stringify(response, null, 2));
 
-Base your analysis on general business principles and industry knowledge.`
-            };
-        }
+                const result = {
+                    message: response.output.text,
+                    companyQueried: companyName,
+                    stockSymbol: stockSymbol || null,
+                    factorAnalyzed: affect,
+                    retrievalMetadata: {
+                        totalRetrieved: response.citations?.length || 0,
+                        knowledgeBasesUsed: [knowledgeBaseId],
+                        bedrockRegion: bedrockRegion,
+                        usedKnowledgeBase: true,
+                        citations: response.citations || []
+                    }
+                };
 
-        console.log('Sending RetrieveAndGenerate request:', JSON.stringify(retrieveAndGenerateRequest, null, 2));
-        
-        const command = new RetrieveAndGenerateCommand(retrieveAndGenerateRequest);
-        const response = await bedrockAgentClient.send(command);
+                console.log('DEBUGGING - Successful knowledge base result:', JSON.stringify(result, null, 2));
 
-        const responseBody = {
-            message: response.generateResponse.output,
-            companyQueried: companyName,
-            stockSymbol: stockSymbol || null,
-            factorAnalyzed: affect,
-            retrievalMetadata: {
-                totalRetrieved: response.retrievalResults?.length || 0,
-                knowledgeBasesUsed: knowledgeBaseIds || [],
-                bedrockRegion: bedrockRegion,
-                usedKnowledgeBases: knowledgeBaseIds ? true : false
+                if (event.body) {
+                    return {
+                        'statusCode': 200,
+                        'headers': { 'Content-Type': 'application/json' },
+                        'body': JSON.stringify(result),
+                        'isBase64Encoded': false
+                    };
+                }
+
+                return result;
+
+            } catch (kbError) {
+                console.error('DEBUGGING - Knowledge Base Error:', {
+                    message: kbError.message,
+                    name: kbError.name,
+                    metadata: kbError.$metadata,
+                    stack: kbError.stack
+                });
+                throw kbError;
             }
-        };
+        } else {
+            console.log('DEBUGGING - Falling back to direct Bedrock invocation');
+            const bedrockClient = new BedrockRuntimeClient({ 
+                region: bedrockRegion 
+            });
 
-        // If this was an API Gateway event, wrap the response appropriately
-        if (event.body) {
-            return {
-                'statusCode': 200,
-                'headers': { 'Content-Type': 'application/json' },
-                'body': JSON.stringify(responseBody),
-                'isBase64Encoded': false
+            const baseRequest = {
+                modelId: "anthropic.claude-v2",
+                contentType: "application/json",
+                accept: "application/json",
+                body: JSON.stringify({
+                    anthropic_version: "bedrock-2023-05-31",
+                    max_tokens_to_sample: 2048,
+                    temperature: 0.7,
+                    prompt: `\n\nHuman: ${BASE_PROMPT_TEMPLATE(companyName, affect, stockSymbol)}\n\nAssistant:`
+                })
             };
-        }
 
-        // For direct invocation, return the response body directly
-        return responseBody;
+            console.log('DEBUGGING - Direct Bedrock Request:', JSON.stringify(baseRequest, null, 2));
+
+            const command = new InvokeModelCommand(baseRequest);
+            const response = await bedrockClient.send(command);
+            const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+
+            console.log('DEBUGGING - Direct Bedrock Response:', JSON.stringify(responseBody, null, 2));
+
+            const result = {
+                message: responseBody.completion,
+                companyQueried: companyName,
+                stockSymbol: stockSymbol || null,
+                factorAnalyzed: affect,
+                retrievalMetadata: {
+                    totalRetrieved: 0,
+                    knowledgeBasesUsed: [],
+                    bedrockRegion: bedrockRegion,
+                    usedKnowledgeBase: false,
+                    citations: []
+                }
+            };
+
+            console.log('DEBUGGING - Direct Bedrock Result:', JSON.stringify(result, null, 2));
+
+            if (event.body) {
+                return {
+                    'statusCode': 200,
+                    'headers': { 'Content-Type': 'application/json' },
+                    'body': JSON.stringify(result),
+                    'isBase64Encoded': false
+                };
+            }
+
+            return result;
+        }
 
     } catch (err) {
-        console.error('Error details:', {
+        console.error('DEBUGGING - Main Error Handler:', {
             message: err.message,
-            stack: err.stack,
-            name: err.name
+            name: err.name,
+            metadata: err.$metadata,
+            stack: err.stack
         });
 
         const errorResponse = {
@@ -141,7 +217,6 @@ Base your analysis on general business principles and industry knowledge.`
             error: err.message
         };
 
-        // If this was an API Gateway event, wrap the error response appropriately
         if (event.body) {
             return {
                 'statusCode': err.message.includes('required') || 
@@ -151,7 +226,6 @@ Base your analysis on general business principles and industry knowledge.`
             };
         }
 
-        // For direct invocation, throw the error or return error response
         throw err;
     }
 };

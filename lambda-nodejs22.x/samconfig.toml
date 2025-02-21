@@ -1,8 +1,8 @@
 version = 0.1
 
 [default.global.parameters]
-stack_name = "hello-test"
-region = "us-east-1"
+stack_name = "mk-bedrock"
+region = "us-west-2"
 
 [default.build.parameters]
 cached = true
@@ -15,9 +15,9 @@ lint = true
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
-stack_name = "hello-test"
-s3_prefix = "hello-test"
-region = "us-east-1"
+stack_name = "mk-bedrock"
+s3_prefix = "mk-bedrock"
+region = "us-west-2"
 image_repositories = [ ]
 
 [default.package.parameters]
@@ -25,7 +25,7 @@ resolve_s3 = true
 
 [default.sync.parameters]
 watch = true
-template_file = "c:\\code\\q-test\\lambda-nodejs22.x\\template.yaml"
+template_file = "template.yaml"
 dependency_layer = false
 
 [default.local_start_api.parameters]
