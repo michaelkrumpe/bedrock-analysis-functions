@@ -1,8 +1,8 @@
+'use strict';
+
 const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-bedrock-runtime");
 const { BedrockAgentRuntimeClient, RetrieveAndGenerateCommand } = require("@aws-sdk/client-bedrock-agent-runtime");
-
-
-const AWSXRay = require('aws-xray-sdk-core');  // Add this line
+const AWSXRay = require('aws-xray-sdk-core');
 
 const isValidAwsRegion = (region) => {
     const regionRegex = /^[a-z]{2}-[a-z]+-\d{1}$/;
@@ -22,7 +22,7 @@ Please structure your response as follows:
 4. Summary of the overall effect`;
 };
 
-exports.lambdaHandler = async (event, context) => {
+exports.handler = async (event, context) => {
     try {
         console.log('DEBUGGING - Event received:', JSON.stringify(event, null, 2));
         
@@ -55,24 +55,8 @@ exports.lambdaHandler = async (event, context) => {
             stockSymbol 
         } = requestBody;
 
-        console.log('DEBUGGING - Extracted Values:', {
-            companyName,
-            affect,
-            knowledgeBaseId,
-            bedrockRegion,
-            stockSymbol
-        });
-
-        console.log('DEBUGGING - Knowledge Base Check:', {
-            hasKnowledgeBaseId: Boolean(knowledgeBaseId),
-            knowledgeBaseIdValue: knowledgeBaseId,
-            knowledgeBaseIdType: typeof knowledgeBaseId,
-            trimmedLength: knowledgeBaseId?.trim()?.length
-        });
-
         if (knowledgeBaseId?.trim()) {
-            console.log('DEBUGGING - Entering knowledge base path');
-            console.log('Using knowledge base:', knowledgeBaseId);
+            console.log('DEBUGGING - Using knowledge base:', knowledgeBaseId);
 
             const bedrockClient = AWSXRay.captureAWSv3Client(new BedrockRuntimeClient({ 
                 region: bedrockRegion 
@@ -81,7 +65,6 @@ exports.lambdaHandler = async (event, context) => {
             const agentClient = AWSXRay.captureAWSv3Client(new BedrockAgentRuntimeClient({ 
                 region: bedrockRegion 
             }));
-
 
             const retrieveRequest = {
                 input: {
@@ -95,54 +78,39 @@ exports.lambdaHandler = async (event, context) => {
                     }
                 }
             };
-            
-            
-            console.log('DEBUGGING - Retrieve Request:', JSON.stringify(retrieveRequest, null, 2));
-            
-            try {
-                const response = await agentClient.send(new RetrieveAndGenerateCommand(retrieveRequest));
-                console.log('DEBUGGING - Knowledge Base Response:', JSON.stringify(response, null, 2));
 
-                const result = {
-                    message: response.output.text,
-                    companyQueried: companyName,
-                    stockSymbol: stockSymbol || null,
-                    factorAnalyzed: affect,
-                    retrievalMetadata: {
-                        totalRetrieved: response.citations?.length || 0,
-                        knowledgeBasesUsed: [knowledgeBaseId],
-                        bedrockRegion: bedrockRegion,
-                        usedKnowledgeBase: true,
-                        citations: response.citations || [],
-                        tokenUsage: {
-                            inputTokens: response.inputTokenUsage || 0,
-                            outputTokens: response.outputTokenUsage || 0,
-                            totalTokens: (response.inputTokenUsage || 0) + (response.outputTokenUsage || 0)
+            const response = await agentClient.send(new RetrieveAndGenerateCommand(retrieveRequest));
+
+            const result = {
+                message: response.output.text,
+                companyQueried: companyName,
+                stockSymbol: stockSymbol || null,
+                factorAnalyzed: affect,
+                retrievalMetadata: {
+                    totalRetrieved: response.citations?.length || 0,
+                    knowledgeBasesUsed: [knowledgeBaseId],
+                    bedrockRegion: bedrockRegion,
+                    usedKnowledgeBase: true,
+                    citations: response.citations || [],
+                    tokenUsage: {
+                        inputTokens: response.inputTokenUsage || 0,
+                        outputTokens: response.outputTokenUsage || 0,
+                        totalTokens: (response.inputTokenUsage || 0) + (response.outputTokenUsage || 0)
                     }
-                };
-
-                console.log('DEBUGGING - Successful knowledge base result:', JSON.stringify(result, null, 2));
-
-                if (event.body) {
-                    return {
-                        'statusCode': 200,
-                        'headers': { 'Content-Type': 'application/json' },
-                        'body': JSON.stringify(result),
-                        'isBase64Encoded': false
-                    };
                 }
+            };
 
-                return result;
-
-            } catch (kbError) {
-                console.error('DEBUGGING - Knowledge Base Error:', {
-                    message: kbError.message,
-                    name: kbError.name,
-                    metadata: kbError.$metadata,
-                    stack: kbError.stack
-                });
-                throw kbError;
+            if (event.body) {
+                return {
+                    'statusCode': 200,
+                    'headers': { 'Content-Type': 'application/json' },
+                    'body': JSON.stringify(result),
+                    'isBase64Encoded': false
+                };
             }
+
+            return result;
+
         } else {
             console.log('DEBUGGING - Falling back to direct Bedrock invocation');
             const bedrockClient = new BedrockRuntimeClient({ 
@@ -161,13 +129,9 @@ exports.lambdaHandler = async (event, context) => {
                 })
             };
 
-            console.log('DEBUGGING - Direct Bedrock Request:', JSON.stringify(baseRequest, null, 2));
-
             const command = new InvokeModelCommand(baseRequest);
             const response = await bedrockClient.send(command);
             const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-
-            console.log('DEBUGGING - Direct Bedrock Response:', JSON.stringify(responseBody, null, 2));
 
             const result = {
                 message: responseBody.completion,
@@ -182,8 +146,6 @@ exports.lambdaHandler = async (event, context) => {
                     citations: []
                 }
             };
-
-            console.log('DEBUGGING - Direct Bedrock Result:', JSON.stringify(result, null, 2));
 
             if (event.body) {
                 return {

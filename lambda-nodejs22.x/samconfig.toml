@@ -1,4 +1,8 @@
 version = 0.1
+[default]
+[default.build]
+parallel = true
+beta_features = false
 
 [default.global.parameters]
 stack_name = "mk-bedrock"
@@ -25,7 +29,7 @@ resolve_s3 = true
 
 [default.sync.parameters]
 watch = true
-template_file = "template.yaml"
+template_file = "template.yml"
 dependency_layer = false
 
 [default.local_start_api.parameters]
