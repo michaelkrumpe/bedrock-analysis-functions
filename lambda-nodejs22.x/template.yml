@@ -33,10 +33,28 @@ Resources:
                 - bedrock:RetrieveAndGenerate
                 - bedrock-agent-runtime:RetrieveAndGenerate
                 - bedrock-agent:GetKnowledgeBase
+                - logs:StartQuery
+                - logs:StopQuery
+                - logs:GetQueryResults
+                - logs:GetLogGroupFields
+                - logs:DescribeLogGroups
+                - logs:DescribeLogStreams
+                - logs:GetLogEvents
+                - cloudwatch:GetMetricData
+                - cloudwatch:GetMetricStatistics
               Resource:
                 - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/*
                 - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
                 - !Sub arn:aws:aoss:${AWS::Region}:${AWS::AccountId}:collection/*
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock/runtime:*"
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock/runtime*:*"
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock/*"
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:BedrockToCloudwatchLogGroup:*"
+            - Effect: Allow
+              Action:
+                - cloudwatch:GetMetricData    # Add a separate statement for CloudWatch
+                - cloudwatch:GetMetricStatistics
+              Resource: "*" 
       Events:
         BedrockAnalysis:
           Type: Api

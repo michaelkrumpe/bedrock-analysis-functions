@@ -5,6 +5,118 @@ const { BedrockAgentRuntimeClient, RetrieveAndGenerateCommand } = require("@aws-
 const AWSXRay = require('aws-xray-sdk-core');
 const { CloudWatchLogsClient, StartQueryCommand, GetLogEventsCommand } = require("@aws-sdk/client-cloudwatch-logs");
 
+const getTokenUsageForRequest = async (timestamp, functionArn, region) => {
+    const cloudWatchClient = new CloudWatchLogsClient({ region });
+    
+    // Add a delay to ensure both logs are written
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    const requestTime = new Date(timestamp);
+    const startTime = requestTime.getTime() - 120 * 1000;
+    const endTime = requestTime.getTime() + 120 * 1000;
+
+    console.log('Searching for logs between:', {
+        startTime: new Date(startTime).toISOString(),
+        endTime: new Date(endTime).toISOString()
+    });
+
+    // Fixed query syntax for CloudWatch Logs Insights
+    const queryString = [
+        'fields @timestamp, @message',
+        'filter @logStream like /aws/bedrock/modelinvocations',
+        'filter operation in ["InvokeModel", "Converse"]',
+        'sort @timestamp asc',
+        'limit 50'
+    ].join('\n');
+
+    try {
+        // Start the query
+        const startQueryCommand = new StartQueryCommand({
+            logGroupName: 'BedrockToCloudwatchLogGroup',
+            startTime: Math.floor(startTime / 1000),
+            endTime: Math.floor(endTime / 1000),
+            queryString: queryString
+        });
+
+        const startQueryResponse = await cloudWatchClient.send(startQueryCommand);
+        const queryId = startQueryResponse.queryId;
+
+        console.log('Started query:', queryId);
+
+        // Wait for results
+        const getQueryResultsCommand = new GetQueryResultsCommand({
+            queryId: queryId
+        });
+
+        let results;
+        for (let attempts = 0; attempts < 10; attempts++) {
+            const resultsResponse = await cloudWatchClient.send(getQueryResultsCommand);
+            
+            if (resultsResponse.status === 'Complete') {
+                results = resultsResponse.results;
+                break;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        if (results && results.length > 0) {
+            console.log(`Found ${results.length} log entries`);
+            
+            // Process each result
+            for (let i = 0; i < results.length; i++) {
+                const result = results[i];
+                try {
+                    const messageField = result.find(f => f.field === '@message');
+                    if (!messageField) {
+                        console.log('No @message field found in result');
+                        continue;
+                    }
+
+                    const message = JSON.parse(messageField.value);
+                    
+                    console.log('\nExamining log entry:', {
+                        timestamp: new Date(message.timestamp).toISOString(),
+                        operation: message.operation
+                    });
+
+                    if (message.operation === "Converse" && 
+                        message.output?.outputBodyJson?.usage) {
+                        
+                        const usage = message.output.outputBodyJson.usage;
+                        console.log('Found token usage:', usage);
+                        
+                        return {
+                            inputTokens: usage.inputTokens,
+                            outputTokens: usage.outputTokens,
+                            totalTokens: usage.totalTokens
+                        };
+                    }
+                } catch (parseError) {
+                    console.log('Error parsing result:', {
+                        error: parseError.message,
+                        result: result
+                    });
+                }
+            }
+            
+            console.log('No matching Converse operation found with token usage');
+        } else {
+            console.log('No results found');
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error querying CloudWatch:', {
+            name: error.name,
+            message: error.message,
+            code: error.$metadata?.httpStatusCode
+        });
+        throw error;
+    }
+};
+
+
 
 const isValidAwsRegion = (region) => {
     const regionRegex = /^[a-z]{2}-[a-z]+-\d{1}$/;
@@ -16,15 +128,12 @@ const BASE_PROMPT_TEMPLATE = (companyName, affect, stockSymbol = null) => {
     return `You are a business analyst examining how external factors affect company performance.
 
 Based on the business knowledge and retrieved information, provide an analysis of how ${affect} impacts ${companyIdentifier}'s business performance and operations.
-
+Please format the content in markdown format.
 Please structure your response as follows:
 1. Brief overview of the relationship between ${affect} and ${companyIdentifier}
 2. Key impacts identified from the data
 3. Notable examples or specific instances (if available)
-4. Summary of the overall effect
-
-Please format the content in markdown format.
-`;
+4. Summary of the overall effect`;
 };
 
 exports.handler = async (event, context) => {
@@ -105,6 +214,27 @@ exports.handler = async (event, context) => {
             const functionArn = context.invokedFunctionArn;
             const requestId = response.$metadata.requestId;
             
+            console.log('Function ARN:', functionArn);
+            console.log('Function Name:', functionArn.split(':').pop());
+            console.log('Timestamp:', timestamp);
+            console.log('Region:', bedrockRegion);
+
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+
+            const tokenUsage = await getTokenUsageForRequest(timestamp, functionArn, bedrockRegion);
+            console.log('Token Usage from CloudWatch:', tokenUsage);
+            response.tokenUsage = tokenUsage || {};
+
+            console.log('DEBUGGING - Request ID:', response.$metadata.requestId);
+            console.log('DEBUGGING - Metadata Content:', JSON.stringify(response.$metadata, null, 2));
+            console.log('DEBUGGING - Output Content:', JSON.stringify(response.output, null, 2));
+            console.log('DEBUGGING - Full Response Structure:', Object.keys(response));
+            console.log('DEBUGGING - Response Metrics:', response.metrics);
+            console.log('DEBUGGING - Response Usage:', response.usage);
+            console.log('DEBUGGING - Response Token Usage:', response.tokenUsage);
+            console.log('DEBUGGING - Output Structure:', Object.keys(response.output || {}));
+            console.log('DEBUGGING - Streaming Config:', response.responseStreamingConfiguration);
+
             const tokenMetrics = response.metrics || 
                     response.usage || 
                     response.tokenUsage || 
@@ -124,7 +254,18 @@ exports.handler = async (event, context) => {
                     bedrockRegion: bedrockRegion,
                     usedKnowledgeBase: true,
                     guardrailId: guardrailId || null,
-                    citations: response.citations || []
+                    citations: response.citations || [],
+                    tokenUsage: {
+                        inputTokens: tokenMetrics.promptTokens || 
+                                    tokenMetrics.inputTokens || 
+                                    tokenMetrics.input_tokens || 0,
+                        outputTokens: tokenMetrics.completionTokens || 
+                                     tokenMetrics.outputTokens || 
+                                     tokenMetrics.output_tokens || 0,
+                        totalTokens: tokenMetrics.totalTokens || 
+                                    tokenMetrics.total_tokens || 
+                                    ((tokenMetrics.promptTokens || 0) + (tokenMetrics.completionTokens || 0))
+                    }
                 }
             };
 
@@ -169,7 +310,6 @@ exports.handler = async (event, context) => {
                 retrievalMetadata: {
                     totalRetrieved: 0,
                     knowledgeBasesUsed: [],
-                    guardrailId: guardrailId,
                     bedrockRegion: bedrockRegion,
                     usedKnowledgeBase: false,
                     citations: []

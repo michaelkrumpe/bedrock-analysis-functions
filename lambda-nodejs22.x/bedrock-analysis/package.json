@@ -5,6 +5,7 @@
     "dependencies": {
       "@aws-sdk/client-bedrock-runtime": "^3.0.0",
       "@aws-sdk/client-bedrock-agent-runtime": "^3.0.0",
+      "@aws-sdk/client-cloudwatch": "^3.x.x",
       "aws-xray-sdk-core": "^3.5.3"
     }
 }

@@ -1,0 +1,48 @@
+{
+    "message": "truncated",
+    "companyQueried": "fedex",
+    "stockSymbol": null,
+    "factorAnalyzed": "Weather",
+    "retrievalMetadata": {
+        "totalRetrieved": 1,
+        "knowledgeBasesUsed": [
+            "VXO8V4WQ6F"
+        ],
+        "bedrockRegion": "us-west-2",
+        "usedKnowledgeBase": true,
+        "guardrailId": "7ryw8d6y5wpm",
+        "citations": [
+            {
+                "generatedResponsePart": {
+                    "textResponsePart": {
+                        "span": {
+                            "end": 1409,
+                            "start": 0
+                        },
+                        "text": "truncated"
+                    }
+                },
+                "retrievedReferences": [
+                    {
+                        "content": {
+                            "text": "truncated",
+                            "type": "TEXT"
+                        },
+                        "location": {
+                            "s3Location": {
+                                "uri": "s3://10k-annual-report-docs/FedEx 2024 10-K.pdf"
+                            },
+                            "type": "S3"
+                        },
+                        "metadata": {
+                            "x-amz-bedrock-kb-source-uri": "s3://10k-annual-report-docs/FedEx 2024 10-K.pdf",
+                            "x-amz-bedrock-kb-document-page-number": 37,
+                            "x-amz-bedrock-kb-chunk-id": "1%3A0%3ALKG_JZUBy_P-xaqCelCv",
+                            "x-amz-bedrock-kb-data-source-id": "ICRLINHCLM"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

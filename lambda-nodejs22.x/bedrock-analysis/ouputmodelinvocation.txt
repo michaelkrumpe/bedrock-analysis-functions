@@ -1,0 +1,34 @@
+2025-02-24T18:21:51.024Z
+2025-02-24T18:21:51.024Z	e6d27f72-54d2-46d3-b215-7f2950350164	INFO	Querying log events with params: {
+  logGroupName: 'BedrockToCloudwatchLogGroup',
+  logStreamName: 'aws/bedrock/modelinvocations',
+  startTime: '2025-02-24T18:20:49.003Z',
+  endTime: '2025-02-24T18:22:49.003Z'
+}
+	
+2025-02-24T18:21:51.024Z e6d27f72-54d2-46d3-b215-7f2950350164 INFO Querying log events with params: { logGroupName: 'BedrockToCloudwatchLogGroup', logStreamName: 'aws/bedrock/modelinvocations', startTime: '2025-02-24T18:20:49.003Z', endTime: '2025-02-24T18:22:49.003Z' }
+	
+2025-02-24T18:21:51.244Z
+2025-02-24T18:21:51.244Z	e6d27f72-54d2-46d3-b215-7f2950350164	INFO	Events found: [
+  {
+    timestamp: '2025-02-24T18:21:39.000Z',
+    messagePreview: '{"schemaType":"ModelInvocationLog","schemaVersion":"1.0","timestamp":"2025-02-24T18:21:39Z","account'
+  }
+]
+	
+2025-02-24T18:21:51.244Z e6d27f72-54d2-46d3-b215-7f2950350164 INFO Events found: [ { timestamp: '2025-02-24T18:21:39.000Z', messagePreview: '{"schemaType":"ModelInvocationLog","schemaVersion":"1.0","timestamp":"2025-02-24T18:21:39Z","account' } ]
+	
+2025-02-24T18:21:51.245Z
+2025-02-24T18:21:51.245Z	e6d27f72-54d2-46d3-b215-7f2950350164	INFO	Parsed message schema: {
+  timestamp: '2025-02-24T18:21:39.000Z',
+  schemaType: 'ModelInvocationLog',
+  hasOutput: true,
+  hasUsage: false
+}
+	
+2025-02-24T18:21:51.245Z e6d27f72-54d2-46d3-b215-7f2950350164 INFO Parsed message schema: { timestamp: '2025-02-24T18:21:39.000Z', schemaType: 'ModelInvocationLog', hasOutput: true, hasUsage: false }
+	
+2025-02-24T18:21:51.261Z
+2025-02-24T18:21:51.261Z	e6d27f72-54d2-46d3-b215-7f2950350164	INFO	Found events but none contained token usage information
+	
+2025-02-24T18:21:51.261Z e6d27f72-54d2-46d3-b215-7f2950350164 INFO Found events but none contained token usage information 
