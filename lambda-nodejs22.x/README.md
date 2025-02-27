@@ -58,7 +58,7 @@ sam deploy --force-upload
 sam deploy --guided
 ```
 
-**Testing Individual Functions
+**Testing Individual Functions**
 ```bash
 sam build FunctionName
 ```
